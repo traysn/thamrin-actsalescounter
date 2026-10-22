@@ -1,0 +1,2 @@
+import {db,respond,fail,admin,token,hash} from '../lib/server.js';
+export default async function handler(req,res){if(req.method!=='POST')return respond(res,405,{error:'Method tidak didukung'});if(!await admin(req))return respond(res,403,{error:'Hanya Admin'});try{const t=token(),{error}=await db().from('supervisor_links').insert({label:'Manager Thamrin',token_hash:hash(t)});if(error)throw error;respond(res,200,{url:`${req.headers.origin||'https://'+req.headers.host}/?supervisor=${encodeURIComponent(t)}`});}catch(e){fail(res,e)}}

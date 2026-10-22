@@ -1,0 +1,1 @@
+{"name":"thamrin-salescounter-online","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"vercel dev","start":"vercel dev"},"dependencies":{"@supabase/supabase-js":"^2.49.0","xlsx":"^0.18.5"},"engines":{"node":">=20"}}
