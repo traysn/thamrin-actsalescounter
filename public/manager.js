@@ -56,7 +56,7 @@ function salesWhatsAppLinks(reports) {
   }
   if (!numbers.size) return '<span class="muted">—</span>';
   return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">${[...numbers].map(number =>
-    `<a href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp +${number}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #ccebdc;border-radius:8px;background:#effaf4;color:#18734b;text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap">↗ +${number}</a>`
+    `<a href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp +${number}" title="+${number}" style="color:#18734b;text-decoration:underline;text-underline-offset:3px;font-size:13px;font-weight:600;white-space:nowrap">Whatsapp</a>`
   ).join('')}</div>`;
 }
 
