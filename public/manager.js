@@ -43,6 +43,23 @@ function groupManagerRows(entries) {
   }
   return [...groups.values()].sort((a,b)=>b.activities-a.activities || a.name.localeCompare(b.name));
 }
+function salesWhatsAppLinks(reports) {
+  const numbers = new Set();
+  for (const report of reports || []) {
+    let value = String(report.whatsapp ?? '').trim();
+    if (!/^[+\d\s().-]+$/.test(value)) continue;
+    value = value.replace(/\D/g, '');
+    if (value.startsWith('0062')) value = value.slice(2);
+    else if (value.startsWith('0')) value = '62' + value.slice(1);
+    else if (value.startsWith('8')) value = '62' + value;
+    if (/^62\d{8,13}$/.test(value)) numbers.add(value);
+  }
+  if (!numbers.size) return '<span class="muted">—</span>';
+  return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">${[...numbers].map(number =>
+    `<a href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp +${number}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #ccebdc;border-radius:8px;background:#effaf4;color:#18734b;text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap">↗ +${number}</a>`
+  ).join('')}</div>`;
+}
+
 function drawTable() {
   managerGroups = groupManagerRows(visibleRows());
   const all=managerGroups,limit=15,pages=Math.max(1,Math.ceil(all.length/limit));
@@ -50,12 +67,12 @@ function drawTable() {
   $('reportCount').textContent=fmt(all.length);
   $('adminDetail').innerHTML='';
   $('reportRows').innerHTML=all.slice(page*limit,(page+1)*limit).map((g,i)=>`<tr>
-    <td>${page*limit+i+1}</td><td><b>${esc(g.name)}</b></td>
+    <td>${page*limit+i+1}</td><td><b>${esc(g.name)}</b></td><td>${salesWhatsAppLinks(g.reports)}</td>
     <td>${esc([...g.amds].join(', '))}</td><td>${esc([...g.branches].join(', '))}</td>
     <td>${fmt(g.reports.length)}</td><td>${fmt(g.activities)}</td>
     <td>${fmt(g.leads)}</td><td>${fmt(g.prospects)}</td><td>${fmt(g.hot)}</td><td>${fmt(g.po)}</td>
     <td><button type="button" class="manager-detail-btn" data-manager-detail="${page*limit+i}">Detail →</button></td>
-  </tr>`).join('') || '<tr><td class="empty" colspan="11">Tidak ada laporan sesuai filter</td></tr>';
+  </tr>`).join('') || '<tr><td class="empty" colspan="12">Tidak ada laporan sesuai filter</td></tr>';
   $('reportRows').querySelectorAll('[data-manager-detail]').forEach(button=>{
     button.onclick=()=>showManagerDetail(Number(button.dataset.managerDetail));
   });
