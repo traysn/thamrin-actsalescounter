@@ -24,7 +24,81 @@ let adminReports=[];
 async function loadAdminTable(){const el=$('#adminTable');if(!el)return;el.innerHTML='<p class="muted">Mengambil laporan...</p>';try{const result=await api('/api/reports');adminReports=result.reports||[];paintAdminTable();if(result.truncated)el.insertAdjacentHTML('afterbegin','<div class="notice error">Data melebihi 10.000 laporan. Sebagian belum ditampilkan.</div>')}catch(e){el.innerHTML=`<div class="notice error">${esc(e.message)}</div>`}}
 function adminFiltered(){const from=$('#adminFrom')?.value||'',to=$('#adminTo')?.value||'',amd=$('#adminAmd')?.value||'',branch=$('#adminBranch')?.value||'',name=($('#adminSearch')?.value||'').trim().toLowerCase();return adminReports.filter(r=>(!from||r.activity_date>=from)&&(!to||r.activity_date<=to)&&(!amd||branches[r.entered_branch]===amd)&&(!branch||r.entered_branch===branch)&&(!name||r.entered_name.toLowerCase().includes(name)))}
 function paintAdminTable(){const el=$('#adminTable');if(!el)return;const rs=adminFiltered(),groups=new Map();for(const r of rs){const key=(r.sales_counter_id||r.entered_name.toLowerCase()+'|'+r.entered_branch)+'|'+r.entered_branch;let x=groups.get(key);if(!x){x={name:r.entered_name,branch:r.entered_branch,reports:[],activity:0,lead:0,prospek:0,hot:0,po:0};groups.set(key,x)}x.reports.push(r);for(const d of r.activity_details||[]){x.activity++;x.lead+=Number(d.leads)||0;x.prospek+=Number(d.prospects)||0;x.hot+=Number(d.hot_prospects)||0;x.po+=Number(d.po)||0}}const rows=[...groups.values()].sort((a,b)=>b.activity-a.activity);const sums=rows.reduce((a,r)=>{a.act+=r.activity;a.lead+=r.lead;a.po+=r.po;return a},{act:0,lead:0,po:0});$('#adminSummary').innerHTML=`<div class="admin-kpis"><div><b>${rows.length}</b><small>Sales Counter</small></div><div><b>${rs.length}</b><small>Laporan</small></div><div><b>${sums.act}</b><small>Aktivitas</small></div><div><b>${sums.lead}</b><small>Lead</small></div><div><b>${sums.po}</b><small>PO</small></div></div>`;el.innerHTML=`<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Sales Counter</th><th>AMD</th><th>Cabang</th><th>Laporan</th><th>Aktivitas</th><th>Lead</th><th>Prospek</th><th>Hot</th><th>PO</th><th>Aksi</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(branches[x.branch]||'-')}</td><td>${esc(x.branch)}</td><td>${x.reports.length}</td><td>${x.activity}</td><td>${x.lead}</td><td>${x.prospek}</td><td>${x.hot}</td><td>${x.po}</td><td><button class="btn" onclick="showAdminDetail(${i})">Detail</button></td></tr>`).join('')||'<tr><td colspan="10">Belum ada laporan sesuai filter.</td></tr>'}</tbody></table></div>`;window._adminGroups=rows;const d=$('#adminDetail');if(d)d.innerHTML=''}
-function showAdminDetail(i){const x=window._adminGroups?.[i];if(!x)return;$('#adminDetail').innerHTML=`<div class="admin-detail"><div class="actions" style="justify-content:space-between"><h3>Detail Laporan • ${esc(x.name)}</h3><button class="btn" onclick="document.querySelector('#adminDetail').innerHTML=''">Tutup</button></div>${x.reports.map(r=>`<div class="admin-report"><div><b>${esc(r.activity_date)}</b> · ${esc(r.entered_branch)}<div class="muted">${(r.activity_details||[]).map(d=>esc(typeName(d.activity_type))).join(', ')||'Tanpa aktivitas'}</div><small class="muted">ID: ${esc(r.id)}</small></div><button class="btn admin-danger" onclick="deleteAdminReport('${esc(r.id)}')">Hapus Permanen</button></div>`).join('')}</div>`;$('#adminDetail').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function showAdminDetail(i) {
+  const x = window._adminGroups?.[i];
+  const panel = $('#adminDetail');
+  if (!x || !panel) return;
+
+  const count = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const answerText = value => {
+    if (value == null || value === '') return '—';
+    if (Array.isArray(value)) return value.length ? value.map(answerText).join(', ') : '—';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  panel.innerHTML = `
+    <div class="admin-detail">
+      <div class="actions admin-detail-head">
+        <h3>Detail Laporan • ${esc(x.name)}</h3>
+        <button type="button" class="btn" data-close-detail>Tutup</button>
+      </div>
+      ${x.reports.map((r, reportIndex) => `
+        <section class="admin-report-card">
+          <div class="admin-report">
+            <div>
+              <b>${esc(r.activity_date)}</b> · ${esc(r.entered_branch)}
+              <div class="muted">WhatsApp: ${esc(r.whatsapp || '—')}</div>
+              <small class="muted">ID: ${esc(r.id)}</small>
+            </div>
+            <button type="button" class="btn admin-danger"
+              data-delete-report="${reportIndex}">Hapus Permanen</button>
+          </div>
+          ${(r.activity_details || []).map(d => {
+            const definition = TYPES.find(t => t.id === d.activity_type);
+            const answers = d.answers && typeof d.answers === 'object'
+              && !Array.isArray(d.answers) ? d.answers : {};
+            const photos = d.activity_photos || [];
+            return `
+              <article class="admin-activity">
+                <h4>${esc(definition?.title || d.activity_type || 'Aktivitas')}</h4>
+                <div class="admin-activity-stats">
+                  <div><b>${count(d.leads)}</b><small>Lead</small></div>
+                  <div><b>${count(d.prospects)}</b><small>Prospek</small></div>
+                  <div><b>${count(d.hot_prospects)}</b><small>Hot Prospek</small></div>
+                  <div><b>${count(d.po)}</b><small>PO</small></div>
+                </div>
+                <h5>Jawaban Form</h5>
+                <dl class="admin-answers">
+                  ${Object.entries(answers).map(([key, value]) => {
+                    const field = definition?.fields.find(f => f[0] === key);
+                    return `<div><dt>${esc(field?.[1] || key)}</dt>
+                      <dd>${esc(answerText(value))}</dd></div>`;
+                  }).join('') || '<div><dd>Belum ada jawaban tersimpan.</dd></div>'}
+                </dl>
+                <div class="actions">
+                  ${photos.map((p, photoIndex) => `
+                    <button type="button" class="btn" data-photo-id="${esc(p.id)}">
+                      Lihat Foto ${photoIndex + 1}
+                    </button>`).join('')}
+                </div>
+              </article>`;
+          }).join('') || '<p class="muted admin-no-activity">Tanpa aktivitas.</p>'}
+        </section>
+      `).join('') || '<p class="muted">Belum ada laporan.</p>'}
+    </div>`;
+
+  panel.querySelector('[data-close-detail]').onclick = () => {
+    panel.innerHTML = '';
+  };
+  panel.querySelectorAll('[data-delete-report]').forEach(button => {
+    button.onclick = () => deleteAdminReport(x.reports[Number(button.dataset.deleteReport)].id);
+  });
+  panel.querySelectorAll('[data-photo-id]').forEach(button => {
+    button.onclick = () => openPhoto(button.dataset.photoId);
+  });
+  panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
 async function deleteAdminReport(id){const r=adminReports.find(x=>x.id===id);if(!r)return;const ok=confirm(`HAPUS PERMANEN laporan berikut?\n\n${r.entered_name} • ${r.entered_branch}\nTanggal: ${r.activity_date}\nAktivitas: ${(r.activity_details||[]).length}\n\nData dan foto tidak bisa dipulihkan.`);if(!ok)return;const confirmText=prompt('Ketik HAPUS untuk mengonfirmasi penghapusan permanen:');if(confirmText!=='HAPUS')return;try{await api('/api/delete-report',{method:'POST',body:JSON.stringify({reportId:id,confirmation:'HAPUS'})});await loadAdminTable();alert('Laporan berhasil dihapus permanen. Dashboard Manager akan terbarui saat refresh.')}catch(e){alert('Gagal menghapus: '+e.message)}}
 function dashboardShell(){return `<section class="analytics"><div class="analytics-title"><div><span class="eyebrow">PERFORMANCE OVERVIEW</span><h2>Dashboard Aktivitas Sales Counter</h2><p class="muted">Analisis seluruh laporan yang masuk • Data langsung dari Supabase</p></div><span class="pill" id="lastRefresh">Belum dimuat</span></div><div class="filter-panel"><div class="filter-heading"><b>Filter Analisis</b><span class="muted">Gabungkan beberapa filter untuk mempersempit data</span></div><div class="grid dashboard-filters"><div class="field"><label>Dari Tanggal</label><input type="date" id="filterStart" value="${today()}"></div><div class="field"><label>Sampai Tanggal</label><input type="date" id="filterEnd" value="${today()}"></div><div class="field"><label>AMD</label><select id="filterAmd" onchange="paintDashboard()"><option value="">Semua AMD</option>${[...new Set(Object.values(branches))].filter(Boolean).sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Cabang</label><select id="filterBranch" onchange="paintDashboard()"><option value="">Semua Cabang</option>${Object.keys(branches).sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Sales Counter</label><input id="filterName" placeholder="Cari nama..." oninput="paintDashboard()"></div><div class="field"><label>Jenis Aktivitas</label><select id="filterActivity" onchange="paintDashboard()"><option value="">Semua Aktivitas</option>${TYPES.map(t=>`<option value="${esc(t.id)}">${esc(t.title)}</option>`).join('')}</select></div><div class="field"><label>Kecocokan Master</label><select id="filterMatch" onchange="paintDashboard()"><option value="">Semua Laporan</option><option value="matched">Cocok Master</option><option value="pending">Belum Cocok</option></select></div></div><div class="actions"><button class="btn primary" onclick="loadDashboard()">↻ Terapkan / Refresh</button><button class="btn" onclick="resetDashFilters()">Reset Filter</button><button class="btn" onclick="exportDashboardXLSX()">↓ Download Excel</button></div></div><div id="dashBody"></div></section>`}
 function managerPage(){return `<div class="manager-intro"><span class="eyebrow">THAMRIN BROTHERS • SALES COUNTER</span><h1>Sales Activity Intelligence</h1><p>Monitoring aktivitas dan pencapaian Sales Counter secara real-time.</p></div>${dashboardShell()}`}
