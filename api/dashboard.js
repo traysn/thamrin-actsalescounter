@@ -19,6 +19,6 @@ export default async function handler(req,res){
   const matched=new Set(reports.filter(r=>r.match_status==='matched'&&r.sales_counter_id).map(r=>`${r.activity_date}|${r.sales_counter_id}`));
   const mapped=roster.map(x=>({...x,has_report:matched.has(`${x.roster_date}|${x.sales_counter_id}`)}));
   const safeReports=isPrivileged?reports:reports.map(r=>({...r,activity_details:(r.activity_details||[]).map(d=>({...d,answers:{},activity_photos:[]}))}));
-  res.setHeader('Cache-Control','no-store');respond(res,200,{start,end,roster:isPrivileged?mapped:[],reports:safeReports,truncated,estimated:false});
+  res.setHeader('Cache-Control','no-store');respond(res,200,{contactVersion:"WA11",start,end,roster:isPrivileged?mapped:[],reports:safeReports,truncated,estimated:false});
  }catch(e){fail(res,e)}
 }
