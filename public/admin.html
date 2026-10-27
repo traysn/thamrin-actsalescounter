@@ -17,4 +17,25 @@ body.admin-standalone .admin-table{min-width:980px}
 body.admin-standalone .admin-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media(max-width:950px){body.admin-standalone .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:600px){body.admin-standalone .wrap{width:calc(100% - 24px)!important}body.admin-standalone .grid{grid-template-columns:1fr!important}body.admin-standalone .admin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style><style>
+/* Detail aktivitas di Admin */
+#adminDetail .admin-detail-head{justify-content:space-between;align-items:center}
+#adminDetail .admin-detail-head h3{margin:0}
+#adminDetail .admin-report-card{border:1px solid #dce7f3;border-radius:12px;margin-top:16px;overflow:hidden}
+#adminDetail .admin-report{background:#f6f9fd;overflow-wrap:anywhere}
+#adminDetail .admin-activity{padding:16px;border-bottom:1px solid #e7edf5;min-width:0}
+#adminDetail .admin-activity:last-child{border-bottom:0}
+#adminDetail .admin-activity h4{margin:0 0 12px;color:#173c65}
+#adminDetail .admin-activity h5{margin:16px 0 10px;font-size:14px}
+#adminDetail .admin-activity-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#adminDetail .admin-activity-stats>div{background:#f0f6fc;border-radius:10px;padding:12px}
+#adminDetail .admin-activity-stats b{display:block;font-size:22px;color:#07539b;overflow-wrap:anywhere}
+#adminDetail .admin-activity-stats small{display:block;color:#55708c;margin-top:4px}
+#adminDetail .admin-answers{margin:0 0 14px}
+#adminDetail .admin-answers>div{padding:10px 0;border-bottom:1px solid #edf2f7}
+#adminDetail .admin-answers dt{font-size:13px;font-weight:700;color:#294869;overflow-wrap:anywhere}
+#adminDetail .admin-answers dd{margin:5px 0 0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+#adminDetail .admin-no-activity{padding:0 16px}
+@media(max-width:600px){#adminDetail .admin-activity-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#adminDetail .admin-detail{padding:12px}}
+
 </style></head><body class="admin-standalone"><header class="top"><div class="topin"><div><img src="/logo.png" alt="Thamrin" class="logo"><div class="brand">SALES COUNTER ACTIVITY MONITORING</div></div><nav class="nav"><a class="btn" href="/">Form Sales</a><a class="btn primary" id="adminNav" href="/admin.html">Admin</a></nav></div></header><main class="wrap" id="app"></main><footer class="foot">Thamrin Brothers • Monitoring Sales Counter 0 PO</footer><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="/app.js"></script></body></html>
