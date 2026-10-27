@@ -36,7 +36,7 @@ function salesWhatsAppLinks(reports) {
   }
   if (!numbers.size) return '<span class="muted">—</span>';
   return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">${[...numbers].map(number =>
-    `<a href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp +${number}" title="+${number}" style="color:#18734b;text-decoration:underline;text-underline-offset:3px;font-size:13px;font-weight:600;white-space:nowrap">Whatsapp</a>`
+    `<a href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp +${number}" title="+${number}" style="display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:30px;padding:7px 12px;border-radius:8px;background:#e2f6ed;color:#007e60;text-decoration:none;font-family:inherit;font-size:12px;font-weight:700;line-height:1.3;white-space:nowrap;transition:background .15s,box-shadow .15s" onmouseenter="this.style.background='#cef0e1'" onmouseleave="this.style.background='#e2f6ed'" onfocus="this.style.boxShadow='0 0 0 3px #b4e8d3'" onblur="this.style.boxShadow='none'">Chat WhatsApp <span aria-hidden="true">↗</span></a>`
   ).join('')}</div>`;
 }
 
