@@ -38,6 +38,42 @@ function showAdminDetail(i) {
   };
 
   panel.innerHTML = `
+<style>#adminDetail{font-family:"Segoe UI",Arial,sans-serif;color:#18334f;font-size:14px;line-height:1.55}
+#adminDetail *{box-sizing:border-box}
+#adminDetail .admin-detail{margin-top:24px;padding:24px;background:#f4f7fb;border:1px solid #dce5ef;border-radius:18px}
+#adminDetail .admin-detail-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
+#adminDetail .admin-detail-head h3{margin:0;font-size:20px;line-height:1.4;overflow-wrap:anywhere}
+#adminDetail .btn{font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;display:inline-flex;justify-content:center;align-items:center;min-height:38px;padding:9px 14px;border:1px solid #cddceb;background:#fff;color:#215c91;border-radius:9px;cursor:pointer;flex-shrink:0}
+#adminDetail .btn:hover{background:#edf5ff;border-color:#91b6db}
+#adminDetail .btn:focus-visible{outline:3px solid #8dc4ff;outline-offset:2px}
+#adminDetail .admin-report-card{border:1px solid #dce5ef;border-radius:14px;margin-top:18px;background:#fff;overflow:hidden}
+#adminDetail .admin-report{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;background:#fff;border-bottom:1px solid #e7edf5;overflow-wrap:anywhere}
+#adminDetail .admin-report b{font-size:15px}
+#adminDetail .muted{font-size:12px;color:#748399}
+#adminDetail .admin-report small{display:block;font-size:10px;color:#94a0b0;margin-top:3px}
+#adminDetail .admin-danger{color:#ba3434!important;background:#fff!important;border-color:#efcaca!important;font-size:12px}
+#adminDetail .admin-danger:hover{background:#fff2f2!important}
+#adminDetail .admin-activity{margin:18px;padding:22px;border:1px solid #e2e9f2;border-radius:12px;background:#fff;min-width:0}
+#adminDetail .admin-activity h4{margin:0 0 18px;font-size:17px;font-weight:700;color:#183e65}
+#adminDetail .admin-activity-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#adminDetail .admin-activity-stats>div{background:#f1f6fd;border:1px solid #e3edf9;border-radius:10px;padding:14px 16px}
+#adminDetail .admin-activity-stats>div:nth-child(2){background:#f3f0fc;border-color:#eae4f8}
+#adminDetail .admin-activity-stats>div:nth-child(3){background:#fff5ed;border-color:#ffeadb}
+#adminDetail .admin-activity-stats>div:nth-child(4){background:#edf8f3;border-color:#def0e7}
+#adminDetail .admin-activity-stats b{display:block;font-size:27px;line-height:1.2;font-weight:750;color:#225b98;overflow-wrap:anywhere}
+#adminDetail .admin-activity-stats>div:nth-child(2) b{color:#7453ac}
+#adminDetail .admin-activity-stats>div:nth-child(3) b{color:#b9732d}
+#adminDetail .admin-activity-stats>div:nth-child(4) b{color:#27815c}
+#adminDetail .admin-activity-stats small{display:block;font-size:12px;font-weight:600;color:#63768c;margin-top:7px}
+#adminDetail .admin-activity h5{margin:24px 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7d8da0}
+#adminDetail .admin-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;margin:0 0 16px}
+#adminDetail .admin-answers>div{padding:13px 0;border-bottom:1px solid #edf1f6;min-width:0}
+#adminDetail .admin-answers dt{font-size:12px;font-weight:400;line-height:1.5;color:#748399;overflow-wrap:anywhere}
+#adminDetail .admin-answers dd{margin:5px 0 0;font-size:14px;font-weight:600;line-height:1.6;color:#253f59;white-space:pre-wrap;overflow-wrap:anywhere}
+#adminDetail .actions{display:flex;flex-wrap:wrap;gap:8px}
+#adminDetail .admin-no-activity{padding:0 22px}
+@media(max-width:640px){#adminDetail .admin-detail{padding:12px;border-radius:12px}#adminDetail .admin-detail-head h3{font-size:17px}#adminDetail .admin-report{padding:16px;align-items:flex-start;flex-direction:column}#adminDetail .admin-activity{margin:10px;padding:16px}#adminDetail .admin-activity-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#adminDetail .admin-activity-stats>div{padding:12px}#adminDetail .admin-answers{grid-template-columns:1fr}#adminDetail .admin-activity h4{font-size:16px}}
+</style>
     <div class="admin-detail">
       <div class="actions admin-detail-head">
         <h3>Detail Laporan • ${esc(x.name)}</h3>
@@ -70,7 +106,11 @@ function showAdminDetail(i) {
                 </div>
                 <h5>Jawaban Form</h5>
                 <dl class="admin-answers">
-                  ${Object.entries(answers).map(([key, value]) => {
+                  ${Object.entries(answers).sort(([a], [b]) => {
+                    const keys = (definition?.fields || []).map(f => f[0]);
+                    const rank = key => keys.includes(key) ? keys.indexOf(key) : keys.length;
+                    return rank(a) - rank(b);
+                  }).map(([key, value]) => {
                     const field = definition?.fields.find(f => f[0] === key);
                     return `<div><dt>${esc(field?.[1] || key)}</dt>
                       <dd>${esc(answerText(value))}</dd></div>`;
@@ -99,6 +139,7 @@ function showAdminDetail(i) {
   });
   panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 }
+
 async function deleteAdminReport(id){const r=adminReports.find(x=>x.id===id);if(!r)return;const ok=confirm(`HAPUS PERMANEN laporan berikut?\n\n${r.entered_name} • ${r.entered_branch}\nTanggal: ${r.activity_date}\nAktivitas: ${(r.activity_details||[]).length}\n\nData dan foto tidak bisa dipulihkan.`);if(!ok)return;const confirmText=prompt('Ketik HAPUS untuk mengonfirmasi penghapusan permanen:');if(confirmText!=='HAPUS')return;try{await api('/api/delete-report',{method:'POST',body:JSON.stringify({reportId:id,confirmation:'HAPUS'})});await loadAdminTable();alert('Laporan berhasil dihapus permanen. Dashboard Manager akan terbarui saat refresh.')}catch(e){alert('Gagal menghapus: '+e.message)}}
 function dashboardShell(){return `<section class="analytics"><div class="analytics-title"><div><span class="eyebrow">PERFORMANCE OVERVIEW</span><h2>Dashboard Aktivitas Sales Counter</h2><p class="muted">Analisis seluruh laporan yang masuk • Data langsung dari Supabase</p></div><span class="pill" id="lastRefresh">Belum dimuat</span></div><div class="filter-panel"><div class="filter-heading"><b>Filter Analisis</b><span class="muted">Gabungkan beberapa filter untuk mempersempit data</span></div><div class="grid dashboard-filters"><div class="field"><label>Dari Tanggal</label><input type="date" id="filterStart" value="${today()}"></div><div class="field"><label>Sampai Tanggal</label><input type="date" id="filterEnd" value="${today()}"></div><div class="field"><label>AMD</label><select id="filterAmd" onchange="paintDashboard()"><option value="">Semua AMD</option>${[...new Set(Object.values(branches))].filter(Boolean).sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Cabang</label><select id="filterBranch" onchange="paintDashboard()"><option value="">Semua Cabang</option>${Object.keys(branches).sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Sales Counter</label><input id="filterName" placeholder="Cari nama..." oninput="paintDashboard()"></div><div class="field"><label>Jenis Aktivitas</label><select id="filterActivity" onchange="paintDashboard()"><option value="">Semua Aktivitas</option>${TYPES.map(t=>`<option value="${esc(t.id)}">${esc(t.title)}</option>`).join('')}</select></div><div class="field"><label>Kecocokan Master</label><select id="filterMatch" onchange="paintDashboard()"><option value="">Semua Laporan</option><option value="matched">Cocok Master</option><option value="pending">Belum Cocok</option></select></div></div><div class="actions"><button class="btn primary" onclick="loadDashboard()">↻ Terapkan / Refresh</button><button class="btn" onclick="resetDashFilters()">Reset Filter</button><button class="btn" onclick="exportDashboardXLSX()">↓ Download Excel</button></div></div><div id="dashBody"></div></section>`}
 function managerPage(){return `<div class="manager-intro"><span class="eyebrow">THAMRIN BROTHERS • SALES COUNTER</span><h1>Sales Activity Intelligence</h1><p>Monitoring aktivitas dan pencapaian Sales Counter secara real-time.</p></div>${dashboardShell()}`}
