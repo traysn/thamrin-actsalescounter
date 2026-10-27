@@ -1,4 +1,3 @@
-
 {
   "rewrites": [
     {
@@ -13,5 +12,10 @@
       "source": "/manager.html",
       "destination": "/manager.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/photo.js": {
+      "maxDuration": 60
+    }
+  }
 }
