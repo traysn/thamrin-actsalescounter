@@ -1,7 +1,7 @@
 import {db,respond,fail,authorize,validDate,today} from '../lib/server.js';
 export default async function handler(req,res){
  if(req.method!=='GET')return respond(res,405,{error:'Method tidak didukung'});
- const isPrivileged=await authorize(req); // Kontak WhatsApp tampil di dashboard biasa; jawaban, foto, dan roster tetap dibatasi.
+ const isPrivileged=await authorize(req); // WhatsApp dan jawaban form tersedia di dashboard biasa; foto dan roster tetap dibatasi.
  try{
   const start=req.query.start||req.query.date||today(),end=req.query.end||start;
   if(!validDate(start)||!validDate(end)||end<start)return respond(res,400,{error:'Rentang tanggal tidak valid'});
@@ -18,7 +18,7 @@ export default async function handler(req,res){
   }
   const matched=new Set(reports.filter(r=>r.match_status==='matched'&&r.sales_counter_id).map(r=>`${r.activity_date}|${r.sales_counter_id}`));
   const mapped=roster.map(x=>({...x,has_report:matched.has(`${x.roster_date}|${x.sales_counter_id}`)}));
-  const safeReports=isPrivileged?reports:reports.map(r=>({...r,activity_details:(r.activity_details||[]).map(d=>({...d,answers:{},activity_photos:[]}))}));
+  const safeReports=isPrivileged?reports:reports.map(r=>({...r,activity_details:(r.activity_details||[]).map(d=>({...d,activity_photos:[]}))}));
   res.setHeader('Cache-Control','no-store');respond(res,200,{contactVersion:"WA11",start,end,roster:isPrivileged?mapped:[],reports:safeReports,truncated,estimated:false});
  }catch(e){fail(res,e)}
 }
