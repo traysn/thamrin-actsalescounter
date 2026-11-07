@@ -90,23 +90,31 @@ function getAMD(branch){return branches[branch]||branches[String(branch||'').tri
 function makeOptions(id,values,label,old){$(id).innerHTML=`<option value="">${label}</option>`+values.map(x=>`<option value="${esc(x)}" ${x===old?'selected':''}>${esc(x)}</option>`).join('')}
 async function init(){ $('start').value=dayAgo(13);$('end').value=localDate();try{const r=await fetch('/branches.json');if(r.ok)branches=await r.json()}catch(e){};makeOptions('activity',TYPES.map(x=>x[0]),'Semua Aktivitas','');$('activity').innerHTML='<option value="">Semua Aktivitas</option>'+TYPES.map(x=>`<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('');
 $('apply').onclick=load;$('reset').onclick=()=>{['amd','branch','name','activity','match','tableSearch'].forEach(id=>$(id).value='');$('start').value=dayAgo(13);$('end').value=localDate();load()};['amd','branch','name','activity','match'].forEach(id=>$(id).addEventListener('change',filter));$('name').addEventListener('input',filter);$('tableSearch').addEventListener('input',()=>{page=0;drawTable()});['trendMetric','activityMetric','amdSort','branchSort'].forEach(id=>$(id).addEventListener('change',render));$('prevPage').onclick=()=>{page=Math.max(0,page-1);drawTable()};$('nextPage').onclick=()=>{page++;drawTable()};$('recapSort').onchange=()=>{page=0;drawTable();};$('export').onclick=exportExcel;$('exportNamesPDF').onclick=exportManagerNamesPDF;await load()}
+let mainLoadRequest=0,mainLoadedRange=null;
 async function load(){
  const start=$('start').value,end=$('end').value;
  if(!start||!end||start>end){setNotice('Rentang tanggal tidak valid.');return;}
+ const mainRequest=++mainLoadRequest;
  setNotice('');$('apply').disabled=true;$('apply').textContent='Memuat...';
  try{
  const response=await fetch('/api/dashboard?start='+encodeURIComponent(start)+'&end='+encodeURIComponent(end)+'&contactVersion=WA11',{cache:'no-store',headers:managerHeaders()});
- const json=await response.json();if(!response.ok)throw Error(json.error||'Gagal mengambil laporan');
- raw=(json.reports||[]).filter(r=>r.activity_date>=start&&r.activity_date<=end);loaded=true;
+ const json=await response.json();if(mainRequest!==mainLoadRequest)return;if(!response.ok)throw Error(json.error||'Gagal mengambil laporan');
+ raw=(json.reports||[]).filter(r=>r.activity_date>=start&&r.activity_date<=end);loaded=true;mainLoadedRange={start,end};
  const directory=Array.isArray(json.salesDirectory)?json.salesDirectory:[];
  makeOptions('amd',[...new Set([...raw.map(r=>getAMD(r.entered_branch)),...directory.map(p=>getAMD(p.branch))])].sort(),'Semua AMD',$('amd').value);
  makeOptions('branch',[...new Set([...raw.map(r=>r.entered_branch),...directory.map(p=>p.branch)].filter(Boolean))].sort(),'Semua Cabang',$('branch').value);
  if(json.truncated)setNotice('Data melebihi batas server. Sempitkan periode untuk hasil lengkap.');
- $('updatedAt').textContent=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})+' · INPUT22';
+ $('updatedAt').textContent=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})+' · SYNC24';
  filter();
- if(!dailyState.ready){try{initDailyMonitoring(json,start,end);}catch(error){$('dailyNotice').textContent=error.message;$('dailyNotice').hidden=false;}}
- }catch(error){setNotice(error.message);loaded=false;raw=[];filter();}
- finally{$('apply').disabled=false;$('apply').textContent='⚲  Terapkan Filter';}
+ try{
+ if(!dailyState.ready)initDailyMonitoring(json,start,end);
+ else if(start<=dailyState.start&&end>=dailyState.end){
+  ++dailyState.request;dailyState.loading=false;$('dailyApply').disabled=false;$('dailyApply').textContent='Terapkan Tanggal';
+  acceptDailyData({...json,reports:(json.reports||[]).filter(r=>r.activity_date>=dailyState.start&&r.activity_date<=dailyState.end)},dailyState.start,dailyState.end);
+ }else await loadDailyMonitoring({start:dailyState.start,end:dailyState.end});
+ }catch(error){$('dailyNotice').textContent=error.message;$('dailyNotice').hidden=false;}
+ }catch(error){if(mainRequest===mainLoadRequest){setNotice(error.message);loaded=false;raw=[];filter();}}
+ finally{if(mainRequest===mainLoadRequest){$('apply').disabled=false;$('apply').textContent='⚲  Terapkan Filter';}}
 }
 function filter(){const amd=$('amd').value,branch=$('branch').value,name=$('name').value.trim().toLowerCase(),type=$('activity').value,match=$('match').value;data=raw.filter(r=>(!amd||getAMD(r.entered_branch)===amd)&&(!branch||r.entered_branch===branch)&&(!name||String(r.entered_name||'').toLowerCase().includes(name))&&(!match||(match==='pending'?r.match_status!=='matched':r.match_status===match)));rows=data.flatMap(r=>(r.activity_details||[]).filter(d=>!type||d.activity_type===type).map(d=>({r,d,amd:getAMD(r.entered_branch)})));if(type)data=data.filter(r=>rows.some(x=>x.r.id===r.id));page=0;render()}
 function sum(key){return rows.reduce((s,x)=>s+n(key==='activities'?1:x.d[key]),0)}
@@ -409,12 +417,18 @@ function initDailyMonitoring(json,start,end){
 }
 function acceptDailyData(json,start,end){
  
- dailyState.ready=true;dailyState.start=start;dailyState.end=end;dailyState.reports=json.reports||[];dailyState.directory=json.salesDirectory||[];
+ dailyState.ready=true;dailyState.start=start;dailyState.end=end;dailyState.reports=(json.reports||[]).filter(r=>r.activity_date>=start&&r.activity_date<=end);dailyState.directory=json.salesDirectory||[];
  dailyState.truncated=!!(json.truncated||json.directoryTruncated);
  refreshDailyChoices();drawDailySalesMatrix();
+ // Refresh shared dates in the recap as well, without changing either panel's filters.
+ if(loaded&&mainLoadedRange&&!json.truncated&&start<=mainLoadedRange.end&&end>=mainLoadedRange.start){
+  const fresh=dailyState.reports.filter(r=>r.activity_date>=mainLoadedRange.start&&r.activity_date<=mainLoadedRange.end);
+  const combined=[...raw.filter(r=>r.activity_date<start||r.activity_date>end),...fresh];
+  raw=[...new Map(combined.map(r=>[r.id,r])).values()];filter();
+ }
 }
-async function loadDailyMonitoring(){
- const start=$('dailyFrom').value,end=$('dailyTo').value;
+async function loadDailyMonitoring(range){
+ const start=range&&typeof range.start==='string'?range.start:$('dailyFrom').value,end=range&&typeof range.end==='string'?range.end:$('dailyTo').value;
  try{if(!start||!end||start>end)throw Error('Pilih tanggal mulai dan akhir yang valid.');dailyDateRange(start,end);}catch(error){$('dailyNotice').textContent=error.message;$('dailyNotice').hidden=false;return;}
  const request=++dailyState.request;dailyState.loading=true;$('dailyApply').disabled=true;$('dailyApply').textContent='Memuat...';$('dailyNotice').hidden=true;
  try{
