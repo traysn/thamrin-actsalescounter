@@ -61,7 +61,7 @@
    <label class="daily-field span3">Cabang<select id="dailyBranch"><option value="">Semua cabang</option></select></label>
    <label class="daily-field span4">Nama sales<input id="dailyName" placeholder="Cari nama sales counter..."></label>
    <label class="daily-field span3">Jenis aktivitas<select id="dailyActivity"><option value="">Semua aktivitas</option></select></label>
-   <label class="daily-field span2">Status input<select id="dailyStatus"><option value="all">Semua status</option><option value="input">Sudah input</option><option value="none">Belum input</option><option value="some">Belum lengkap</option><option value="complete">Lengkap setiap hari</option></select></label>
+   <label class="daily-field span2">Status input<select id="dailyStatus"><option value="all">Semua status</option><option value="some">Belum lengkap</option><option value="complete">Lengkap setiap hari</option></select></label>
    <label class="daily-field span3">Urutkan berdasarkan<select id="dailySort"><option value="name">Nama A–Z</option><option value="input-desc">Hari input: terbanyak</option><option value="input-asc">Hari input: tersedikit</option><option value="activities-desc">Aktivitas: terbanyak</option><option value="activities-asc">Aktivitas: tersedikit</option><option value="leads-desc">Lead: terbanyak</option><option value="leads-asc">Lead: tersedikit</option><option value="prospects-desc">Prospek: terbanyak</option><option value="prospects-asc">Prospek: tersedikit</option></select></label>
   </div>
   <div class="daily-filter-bottom"><span>Maksimal 31 hari. Klik Terapkan Tanggal untuk memuat rentang baru.</span><div><button type="button" id="dailyReset" class="secondary">Reset</button><button type="button" id="dailyApply" class="primary">Terapkan Tanggal</button></div></div>
@@ -69,7 +69,7 @@
  <div id="dailyNotice" class="notice" role="status" hidden></div>
  <div id="dailyStats" class="daily-stat-grid"></div>
  <div class="daily-table-heading"><div><strong id="dailyRangeLabel">Belum ada periode diterapkan</strong><span id="dailyTableCount"></span></div><div class="daily-legend"><span><i class="legend-zero"></i>0 | 0 | 0</span><span><i class="legend-filled"></i>Ada aktivitas</span></div></div>
- <div id="dailyGrid"><div class="daily-empty"><b>Memuat monitoring harian</b><span>Daftar mengikuti seluruh sales aktif dari master.</span></div></div>
+ <div id="dailyGrid"><div class="daily-empty"><b>Memuat monitoring harian</b><span>Hanya sales counter yang sudah input dalam rentang tanggal pilihan.</span></div></div>
  <p class="daily-bottom-note">Akt = jumlah aktivitas. Hari Input = tanggal yang memiliki laporan sesuai filter. Geser tabel ke kanan untuk tanggal berikutnya. Filter di bagian ini berlaku khusus Monitoring Harian.</p>
  <p id="dailyDataNote" class="daily-bottom-note"></p>
 </section>
@@ -102,7 +102,7 @@ async function load(){
  makeOptions('amd',[...new Set([...raw.map(r=>getAMD(r.entered_branch)),...directory.map(p=>getAMD(p.branch))])].sort(),'Semua AMD',$('amd').value);
  makeOptions('branch',[...new Set([...raw.map(r=>r.entered_branch),...directory.map(p=>p.branch)].filter(Boolean))].sort(),'Semua Cabang',$('branch').value);
  if(json.truncated)setNotice('Data melebihi batas server. Sempitkan periode untuk hasil lengkap.');
- $('updatedAt').textContent=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})+' · DAILY21';
+ $('updatedAt').textContent=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})+' · INPUT22';
  filter();
  if(!dailyState.ready){try{initDailyMonitoring(json,start,end);}catch(error){$('dailyNotice').textContent=error.message;$('dailyNotice').hidden=false;}}
  }catch(error){setNotice(error.message);loaded=false;raw=[];filter();}
@@ -371,18 +371,7 @@ function sortManagerRecap(groups,value){
  return groups.slice().sort((a,b)=>direction*(a[metric]-b[metric])||a.name.localeCompare(b.name,'id-ID'));
 }
 function buildDailySalesMatrix(directory,reports,days,criteria={}){
- const daySet=new Set(days),groups=new Map(),byId=new Map(),byName=new Map();
- for(const p of directory){
-  const name=String(p.name||'').trim().replace(/\s+/g,' ');if(!name)continue;
-  if(criteria.amd&&getAMD(p.branch)!==criteria.amd)continue;
-  if(criteria.branch&&dailySalesName(p.branch)!==dailySalesName(criteria.branch))continue;
-  if(criteria.name&&!dailySalesName(name).includes(dailySalesName(criteria.name)))continue;
-  const key=dailySalesName(name);
-  if(!groups.has(key))groups.set(key,{name,branches:new Set(),amds:new Set(),contacts:[],days:new Map(days.map(day=>[day,{activities:0,leads:0,prospects:0,reports:0}])),reportCount:0,inputDays:0});
-  const g=groups.get(key);g.branches.add(p.branch||'—');g.amds.add(getAMD(p.branch));if(p.whatsapp)g.contacts.push({whatsapp:p.whatsapp});
-  if(p.id)byId.set(p.id,g);byName.set(key,g);
- }
- let outsideMaster=0;
+ const daySet=new Set(days),groups=new Map();
  for(const r of reports){
   if(!daySet.has(r.activity_date))continue;
   if(criteria.amd&&getAMD(r.entered_branch)!==criteria.amd)continue;
@@ -390,23 +379,28 @@ function buildDailySalesMatrix(directory,reports,days,criteria={}){
   if(criteria.name&&!dailySalesName(r.entered_name).includes(dailySalesName(criteria.name)))continue;
   const details=(r.activity_details||[]).filter(d=>!criteria.type||d.activity_type===criteria.type);
   if(criteria.type&&!details.length)continue;
-  const g=byId.get(r.sales_counter_id)||byName.get(dailySalesName(r.entered_name));
-  if(!g){outsideMaster++;continue;}
-  const cell=g.days.get(r.activity_date);cell.reports++;g.reportCount++;if(r.whatsapp)g.contacts.push({whatsapp:r.whatsapp});
+  const name=String(r.entered_name||'').trim().replace(/\s+/g,' ');if(!name)continue;
+  const key=dailySalesName(name);
+  if(!groups.has(key))groups.set(key,{name,branches:new Set(),amds:new Set(),contacts:[],days:new Map(days.map(day=>[day,{activities:0,leads:0,prospects:0,reports:0}])),reportCount:0,inputDays:0});
+  const g=groups.get(key);g.branches.add(r.entered_branch||'—');g.amds.add(getAMD(r.entered_branch));
+  if(r.whatsapp)g.contacts.push({whatsapp:r.whatsapp});
+  const person=directory.find(p=>(r.sales_counter_id&&p.id===r.sales_counter_id)||dailySalesName(p.name)===key);
+  if(person&&person.whatsapp)g.contacts.push({whatsapp:person.whatsapp});
+  const cell=g.days.get(r.activity_date);cell.reports++;g.reportCount++;
   for(const d of details){cell.activities++;cell.leads+=Number(d.leads)||0;cell.prospects+=Number(d.prospects)||0;}
  }
  const list=[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'id-ID'));
  for(const g of list)g.inputDays=[...g.days.values()].filter(cell=>cell.reports>0).length;
- return {rows:list,outsideMaster};
+ return {rows:list,outsideMaster:0};
 }
 
 const dailyState={ready:false,loading:false,start:'',end:'',reports:[],directory:[],truncated:false,request:0};
 let dailyVisibleRows=[],dailyVisibleDays=[];
 function dailySelectOptions(id,values,placeholder){const old=$(id).value;makeOptions(id,[...new Set(values)].filter(Boolean).sort((a,b)=>a.localeCompare(b,'id-ID')),placeholder,old);if(!values.includes(old))$(id).value='';}
 function refreshDailyChoices(){
- dailySelectOptions('dailyAmd',dailyState.directory.map(p=>getAMD(p.branch)),'Semua AMD');
+ dailySelectOptions('dailyAmd',dailyState.reports.map(p=>getAMD(p.entered_branch)),'Semua AMD');
  const amd=$('dailyAmd').value;
- dailySelectOptions('dailyBranch',dailyState.directory.filter(p=>!amd||getAMD(p.branch)===amd).map(p=>p.branch),'Semua cabang');
+ dailySelectOptions('dailyBranch',dailyState.reports.filter(p=>!amd||getAMD(p.entered_branch)===amd).map(p=>p.entered_branch),'Semua cabang');
 }
 function initDailyMonitoring(json,start,end){
  if(dailyState.ready)return;
@@ -414,8 +408,8 @@ function initDailyMonitoring(json,start,end){
  acceptDailyData(json,start,end);
 }
 function acceptDailyData(json,start,end){
- if(!Array.isArray(json.salesDirectory))throw Error('Daftar master belum tersedia. Gunakan api/dashboard.js versi monitoring harian.');
- dailyState.ready=true;dailyState.start=start;dailyState.end=end;dailyState.reports=json.reports||[];dailyState.directory=json.salesDirectory;
+ 
+ dailyState.ready=true;dailyState.start=start;dailyState.end=end;dailyState.reports=json.reports||[];dailyState.directory=json.salesDirectory||[];
  dailyState.truncated=!!(json.truncated||json.directoryTruncated);
  refreshDailyChoices();drawDailySalesMatrix();
 }
@@ -454,11 +448,11 @@ function drawDailySalesMatrix(){
  const {days,list,matrix}=getVisibleDailyRows();dailyVisibleRows=list;dailyVisibleDays=days;
  const inputCount=matrix.rows.filter(g=>g.inputDays>0).length;
  $('dailyRangeLabel').textContent=dateID(dailyState.start)+' – '+dateID(dailyState.end)+' · '+days.length+' hari';
- $('dailyStats').innerHTML=[['Sales aktif',matrix.rows.length,'blue'],['Sudah input',inputCount,'green'],['Belum input',matrix.rows.length-inputCount,'red'],['Ditampilkan',list.length,'gray']].map(([label,value,color])=>'<div class="daily-stat '+color+'"><span>'+label+'</span><b>'+fmt(value)+'</b></div>').join('');
+ $('dailyStats').innerHTML=[['Total Sales Counter Input',inputCount,'blue'],['Lengkap setiap hari',matrix.rows.filter(g=>g.inputDays===days.length).length,'green'],['Belum lengkap',matrix.rows.filter(g=>g.inputDays<days.length).length,'red'],['Ditampilkan',list.length,'gray']].map(([label,value,color])=>'<div class="daily-stat '+color+'"><span>'+label+'</span><b>'+fmt(value)+'</b></div>').join('');
  $('dailyTableCount').textContent=list.length+' nama · '+$('dailyStatus').selectedOptions[0].text;
  const totals=days.map(day=>list.reduce((sum,g)=>{const c=g.days.get(day);sum.activities+=c.activities;sum.leads+=c.leads;sum.prospects+=c.prospects;return sum;},{activities:0,leads:0,prospects:0}));
  $('dailyGrid').innerHTML=`<div class="daily-sales-scroll"><table class="daily-sales-table"><thead><tr><th rowspan="2" class="daily-sales-name">Sales Counter</th><th rowspan="2" class="daily-sales-input">Hari Input</th>${days.map(day=>`<th colspan="3" class="daily-sales-day">${esc(dateID(day))}</th>`).join('')}<th rowspan="2" class="daily-sales-wa">Hubungi</th></tr><tr>${days.map(()=>'<th>Akt</th><th>Lead</th><th class="daily-sales-day-end">Prospek</th>').join('')}</tr></thead><tbody>${list.map(g=>`<tr><td class="daily-sales-name"><strong>${esc(g.name)}</strong><small>${esc([...g.amds].join(', '))} · ${esc([...g.branches].join(', '))}</small></td><td class="daily-sales-input"><b class="daily-input-pill ${g.inputDays===0?'zero':g.inputDays===days.length?'full':'partial'}">${g.inputDays}<span> / ${days.length}</span></b><small>${g.reportCount} laporan</small></td>${days.map(day=>{const c=g.days.get(day),red=c.activities===0&&c.leads===0&&c.prospects===0,info=c.reports?'Sudah input '+c.reports+' laporan.':'Belum ada laporan sesuai filter.';return ['activities','leads','prospects'].map((key,i)=>`<td class="${red?'daily-sales-zero ':''}${i===2?'daily-sales-day-end':''}" title="${esc(info)}">${fmt(c[key])}</td>`).join('');}).join('')}<td class="daily-sales-wa">${salesWhatsAppLinks(g.contacts)}</td></tr>`).join('')||`<tr><td colspan="${3+days.length*3}" class="empty">Tidak ada sales sesuai filter ini.</td></tr>`}</tbody><tfoot><tr><td class="daily-sales-name">TOTAL</td><td class="daily-sales-input">${list.reduce((sum,g)=>sum+g.reportCount,0)} laporan</td>${totals.map(c=>['activities','leads','prospects'].map((key,i)=>`<td class="${i===2?'daily-sales-day-end':''}">${fmt(c[key])}</td>`).join('')).join('')}<td class="daily-sales-wa">—</td></tr></tfoot></table></div>`;
- $('dailyDataNote').textContent=(dailyState.truncated?'Data mencapai batas server; angka mungkin belum lengkap. ':'')+(matrix.outsideMaster?matrix.outsideMaster+' laporan di luar master aktif tetap tersedia di rekap utama. ':'')+'Nama mengikuti master aktif saat ini. Nomor WhatsApp yang belum tersedia ditandai —.';
+ $('dailyDataNote').textContent=(dailyState.truncated?'Data mencapai batas server; angka mungkin belum lengkap. ':'')+'Hanya sales counter yang sudah input dalam rentang tanggal sesuai filter. Sel merah menunjukkan nilai 0 | 0 | 0. Nomor WhatsApp yang belum tersedia ditandai —.';
 }
 function exportDailyMonitoring(){
  if(!dailyState.ready)return alert('Muat monitoring harian dahulu.');if(typeof XLSX==='undefined')return alert('Modul Excel belum termuat.');
