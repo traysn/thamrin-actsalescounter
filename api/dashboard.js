@@ -18,7 +18,29 @@ export default async function handler(req,res){
   }
   const matched=new Set(reports.filter(r=>r.match_status==='matched'&&r.sales_counter_id).map(r=>`${r.activity_date}|${r.sales_counter_id}`));
   const mapped=roster.map(x=>({...x,has_report:matched.has(`${x.roster_date}|${x.sales_counter_id}`)}));
+  const directory=await loadDailySalesDirectory(s);
   const safeReports=isPrivileged?reports:reports.map(r=>({...r,activity_details:(r.activity_details||[]).map(d=>({...d,activity_photos:[]}))}));
-  res.setHeader('Cache-Control','no-store');respond(res,200,{contactVersion:"WA11",start,end,roster:isPrivileged?mapped:[],reports:safeReports,truncated,estimated:false});
+  res.setHeader('Cache-Control','no-store');respond(res,200,{contactVersion:"WA11",salesDirectory:directory.rows,directoryTruncated:directory.truncated,start,end,roster:isPrivileged?mapped:[],reports:safeReports,truncated,estimated:false});
  }catch(e){fail(res,e)}
+}
+
+async function loadDailySalesDirectory(s){
+ const limit=10000,size=500;let employees=[],history=[],truncated=false;
+ for(let offset=0;offset<limit;offset+=size){
+  const {data,error}=await s.from('sales_counters').select('id,full_name,branch,employment_status,whatsapp').order('id').range(offset,offset+size-1);if(error)throw error;
+  employees.push(...(data||[]));if(!data||data.length<size)break;if(offset+size>=limit)truncated=true;
+ }
+ const active=employees.filter(p=>['active','aktif'].includes(String(p.employment_status||'').trim().toLowerCase()));
+ if(active.length){for(let offset=0;offset<limit;offset+=size){
+  const {data,error}=await s.from('activity_reports').select('sales_counter_id,entered_name,entered_branch,whatsapp,submitted_at').order('submitted_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+size-1);if(error)throw error;
+  history.push(...(data||[]));if(!data||data.length<size)break;
+ }}
+ const normalize=v=>String(v||'').trim().replace(/\s+/g,' ').toLowerCase();
+ const phone=v=>{let s=String(v||'').trim();if(!/^[+\d\s().-]+$/.test(s))return null;s=s.replace(/\D/g,'');if(s.startsWith('0062'))s=s.slice(2);else if(s.startsWith('0'))s='62'+s.slice(1);else if(s.startsWith('8'))s='62'+s;return /^62\d{8,13}$/.test(s)?s:null;};
+ const byId=new Map(),byNameBranch=new Map();
+ for(const r of history){const number=phone(r.whatsapp);if(!number)continue;
+  if(r.sales_counter_id&&!byId.has(r.sales_counter_id))byId.set(r.sales_counter_id,number);
+  const key=normalize(r.entered_name)+'|'+normalize(r.entered_branch);if(!byNameBranch.has(key))byNameBranch.set(key,number);
+ }
+ return {rows:active.map(p=>({id:p.id,name:p.full_name,branch:p.branch,whatsapp:phone(p.whatsapp)||byId.get(p.id)||byNameBranch.get(normalize(p.full_name)+'|'+normalize(p.branch))||null})),truncated};
 }
